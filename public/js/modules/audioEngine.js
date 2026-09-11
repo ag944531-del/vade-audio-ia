@@ -436,7 +436,7 @@ class AudioEngine {
    * Envia o texto ao backend ElevenLabs, obtém o MP3 e reproduz via HTML5 Audio
    */
   async speakText(text) {
-    this.stopAudioSource();
+    this.stop();
     if (!text) return;
 
     this.lastSpokenText = text;
@@ -610,6 +610,10 @@ class AudioEngine {
       this.listenStartTimestamp = null;
     }
     this.notifyStateChange({ isPlaying: false, isPaused: false, isLoading: false, article: this.currentArticle });
+  }
+
+  stopAudioSource() {
+    this.stop();
   }
 
   seek(seconds) {

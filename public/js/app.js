@@ -870,6 +870,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // 2. Modais de Auth & Perfil
+  const authModal = document.getElementById('auth-modal');
+  const btnUserProfile = document.getElementById('btn-user-profile');
+  const btnCloseAuthModal = document.getElementById('btn-close-auth-modal');
+
   authService.onAuthChange(user => {
     updateUserHeaderUI(user);
     if (!user) {
@@ -879,11 +884,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (btnCloseAuthModal) btnCloseAuthModal.style.display = 'block';
     }
   });
-
-  // 2. Modais de Auth & Perfil
-  const authModal = document.getElementById('auth-modal');
-  const btnUserProfile = document.getElementById('btn-user-profile');
-  const btnCloseAuthModal = document.getElementById('btn-close-auth-modal');
 
   // Controle de Abas do Modal de Auth (Entrar / Cadastrar / Demo)
   const tabBtnLogin = document.getElementById('tab-btn-auth-login');
