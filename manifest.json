@@ -1,0 +1,22 @@
+{
+  "name": "VadeAudio AI - Vade Mecum em Áudio",
+  "short_name": "VadeAudio AI",
+  "description": "Vade Mecum em Áudio Neural e Estudo Guiado de Direito com ElevenLabs",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0d14",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=192&auto=format&fit=crop",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=512&auto=format&fit=crop",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
