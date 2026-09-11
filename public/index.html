@@ -2689,6 +2689,7 @@
           
           <button id="btn-skip-forward" class="btn-ctrl" title="Avançar 10 segundos"><i class="fa-solid fa-rotate-right"></i></button>
           <button id="btn-next-art" class="btn-ctrl" title="Próximo Artigo"><i class="fa-solid fa-forward-step"></i></button>
+          <button id="btn-audio-settings-modal" class="btn-ctrl btn-mobile-settings-btn" title="Ajustes de Voz & Velocidade"><i class="fa-solid fa-sliders"></i></button>
         </div>
 
         <div class="player-progress-row">
@@ -2748,6 +2749,66 @@
         </button>
       </div>
     </footer>
+
+    <!-- Modal / Bottom Sheet: Ajustes de Áudio & Voz (Mobile & Desktop) -->
+    <div id="audio-settings-modal" class="commute-overlay hidden" style="background: rgba(0,0,0,0.85); backdrop-filter: blur(14px); z-index: 999999;">
+      <div class="commute-content" style="max-width: 480px; text-align: left; background: var(--bg-surface-elevated, #161b26); border: 1px solid var(--border-light, rgba(255,255,255,0.12)); border-radius: 20px; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.7);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+          <h2 style="font-size: 1.2rem; font-family: var(--font-display); color: var(--text-main); margin: 0; display:flex; align-items:center; gap: 8px;">
+            <i class="fa-solid fa-sliders text-amber"></i> Ajustes de Áudio & Voz
+          </h2>
+          <button id="btn-close-audio-settings" class="btn-close-overlay" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-muted); cursor: pointer; padding: 6px 12px; font-size: 0.85rem;">
+            <i class="fa-solid fa-xmark"></i> Fechar
+          </button>
+        </div>
+
+        <!-- Seção 1: Seleção de Voz -->
+        <div style="margin-bottom: 22px;">
+          <label style="display:flex; justify-content:space-between; align-items:center; font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
+            <span><i class="fa-solid fa-microphone-lines text-amber"></i> Voz de Narração</span>
+            <span id="current-voice-badge" style="font-size: 0.75rem; color: var(--accent-amber); font-weight: normal;">Padrão</span>
+          </label>
+          <div style="display:flex; gap: 8px; align-items: center;">
+            <select id="modal-voice-select" class="form-control" style="flex:1; background: var(--bg-primary, #0d1017); color: var(--text-primary, #fff); border: 1px solid var(--border-light, #333); border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; outline: none;">
+              <!-- Preenchido dinamicamente via JS -->
+            </select>
+            <button id="btn-test-voice" class="btn-secondary" style="padding: 10px 14px; font-size: 0.85rem; white-space: nowrap; border-radius: 10px;" title="Testar pronúncia desta voz">
+              <i class="fa-solid fa-volume-high"></i> Testar
+            </button>
+          </div>
+          <small style="display:block; color: var(--text-muted); font-size: 0.76rem; margin-top: 6px;">
+            💡 Lista todas as vozes instaladas no seu smartphone/computador e vozes neurais da plataforma.
+          </small>
+        </div>
+
+        <!-- Seção 2: Velocidade de Leitura -->
+        <div style="margin-bottom: 22px;">
+          <label style="display:block; font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
+            <i class="fa-solid fa-gauge-high" style="color: #38bdf8;"></i> Velocidade de Leitura
+          </label>
+          <div id="modal-speed-options" style="display:grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+            <button class="btn-modal-speed" data-speed="0.75" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">0.75x</button>
+            <button class="btn-modal-speed" data-speed="1.00" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">1.00x</button>
+            <button class="btn-modal-speed" data-speed="1.25" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">1.25x</button>
+            <button class="btn-modal-speed" data-speed="1.50" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">1.50x</button>
+            <button class="btn-modal-speed" data-speed="2.00" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">2.00x</button>
+          </div>
+        </div>
+
+        <!-- Seção 3: Timer de Sono -->
+        <div style="margin-bottom: 12px;">
+          <label style="display:block; font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
+            <i class="fa-solid fa-moon" style="color: #a78bfa;"></i> Timer de Sono (Desligar Áudio)
+          </label>
+          <div id="modal-sleep-options" style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 6px;">
+            <button class="btn-modal-sleep" data-mins="0" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">Off</button>
+            <button class="btn-modal-sleep" data-mins="15" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">15 min</button>
+            <button class="btn-modal-sleep" data-mins="30" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">30 min</button>
+            <button class="btn-modal-sleep" data-mins="60" style="padding: 8px 4px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-light); border-radius: 8px; color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: center;">60 min</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Audio Queue Drawer Modal -->
     <div id="queue-modal" class="commute-overlay hidden" style="background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);">

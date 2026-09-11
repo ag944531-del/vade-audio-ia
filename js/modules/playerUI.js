@@ -28,6 +28,16 @@ class PlayerUI {
     
     // Voice Selector
     this.voiceSelect = document.getElementById('voice-select');
+    this.btnVoiceToggle = document.getElementById('btn-voice-toggle');
+
+    // Audio Settings Modal (Mobile & Desktop)
+    this.audioSettingsModal = document.getElementById('audio-settings-modal');
+    this.btnCloseAudioSettings = document.getElementById('btn-close-audio-settings');
+    this.btnAudioSettingsModal = document.getElementById('btn-audio-settings-modal');
+    this.modalVoiceSelect = document.getElementById('modal-voice-select');
+    this.btnTestVoice = document.getElementById('btn-test-voice');
+    this.currentVoiceBadge = document.getElementById('current-voice-badge');
+    this.playerLeft = document.querySelector('.player-left');
 
     // Controls
     this.btnRepeatMode = document.getElementById('btn-repeat-mode');
@@ -215,10 +225,121 @@ class PlayerUI {
       });
     }
 
+    // Open Audio Settings Modal
+    const openAudioSettings = () => {
+      if (this.audioSettingsModal) {
+        this.audioSettingsModal.classList.remove('hidden');
+        if (this.audioEngine) {
+          const spd = this.audioEngine.speed;
+          document.querySelectorAll('.btn-modal-speed').forEach(b => {
+            b.classList.toggle('active', parseFloat(b.dataset.speed) === spd);
+          });
+        }
+      }
+    };
+
+    if (this.btnAudioSettingsModal) {
+      this.btnAudioSettingsModal.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openAudioSettings();
+      });
+    }
+
+    if (this.btnVoiceToggle) {
+      this.btnVoiceToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openAudioSettings();
+      });
+    }
+
+    if (this.playerLeft) {
+      this.playerLeft.addEventListener('click', (e) => {
+        if (!e.target.closest('button')) {
+          openAudioSettings();
+        }
+      });
+    }
+
+    if (this.btnCloseAudioSettings) {
+      this.btnCloseAudioSettings.addEventListener('click', () => {
+        if (this.audioSettingsModal) this.audioSettingsModal.classList.add('hidden');
+      });
+    }
+
+    if (this.audioSettingsModal) {
+      this.audioSettingsModal.addEventListener('click', (e) => {
+        if (e.target === this.audioSettingsModal) {
+          this.audioSettingsModal.classList.add('hidden');
+        }
+      });
+    }
+
+    // Modal Voice Select
+    if (this.modalVoiceSelect) {
+      this.modalVoiceSelect.addEventListener('change', () => {
+        this.audioEngine.setVoiceByURI(this.modalVoiceSelect.value);
+        if (this.voiceSelect) this.voiceSelect.value = this.modalVoiceSelect.value;
+        const selectedTxt = this.modalVoiceSelect.options[this.modalVoiceSelect.selectedIndex]?.text || '';
+        if (this.currentVoiceBadge) this.currentVoiceBadge.innerText = selectedTxt.split('(')[0].replace('🧠', '').trim();
+        this.showToast(`Voz alterada para: ${selectedTxt}`);
+      });
+    }
+
     // Voice selector
-    this.voiceSelect.addEventListener('change', () => {
-      this.audioEngine.setVoiceByURI(this.voiceSelect.value);
-      this.showToast(`Voz alterada para: ${this.voiceSelect.options[this.voiceSelect.selectedIndex].text}`);
+    if (this.voiceSelect) {
+      this.voiceSelect.addEventListener('change', () => {
+        this.audioEngine.setVoiceByURI(this.voiceSelect.value);
+        if (this.modalVoiceSelect) this.modalVoiceSelect.value = this.voiceSelect.value;
+        const selectedTxt = this.voiceSelect.options[this.voiceSelect.selectedIndex]?.text || '';
+        if (this.currentVoiceBadge) this.currentVoiceBadge.innerText = selectedTxt.split('(')[0].replace('🧠', '').trim();
+        this.showToast(`Voz alterada para: ${selectedTxt}`);
+      });
+    }
+
+    // Test Voice button
+    if (this.btnTestVoice) {
+      this.btnTestVoice.addEventListener('click', () => {
+        const testText = "Olá! Esta é uma demonstração da voz selecionada para o seu estudo no VadeAudio AI.";
+        if (this.audioEngine.speakHumanized) {
+          this.audioEngine.speakHumanized(testText);
+        } else if (this.audioEngine.speakWebSpeech) {
+          this.audioEngine.speakWebSpeech(testText);
+        }
+        this.showToast('Reproduzindo teste de voz...');
+      });
+    }
+
+    // Modal Speed Buttons
+    document.querySelectorAll('.btn-modal-speed').forEach(b => {
+      b.addEventListener('click', () => {
+        const spd = b.dataset.speed;
+        this.updateSpeed(spd);
+        document.querySelectorAll('.btn-modal-speed').forEach(btn => {
+          btn.classList.toggle('active', btn === b);
+        });
+        this.showToast(`Velocidade: ${spd}x`);
+      });
+    });
+
+    // Modal Sleep Buttons
+    document.querySelectorAll('.btn-modal-sleep').forEach(b => {
+      b.addEventListener('click', () => {
+        const mins = parseInt(b.dataset.mins) || 0;
+        this.audioEngine.setSleepTimer(mins);
+        document.querySelectorAll('.btn-modal-sleep').forEach(btn => {
+          btn.classList.toggle('active', btn === b);
+        });
+        if (mins > 0) {
+          if (this.sleepBadge) {
+            this.sleepBadge.innerText = `${mins}m`;
+            this.sleepBadge.classList.remove('hidden');
+          }
+          this.showToast(`Timer ativado para ${mins} min.`);
+        } else {
+          if (this.sleepBadge) this.sleepBadge.classList.add('hidden');
+          this.showToast('Timer de sono cancelado.');
+        }
+      });
     });
 
     // Commute Play button
@@ -440,22 +561,29 @@ class PlayerUI {
   }
 
   populateVoiceSelect(voices = []) {
-    this.voiceSelect.innerHTML = '';
+    const selects = [this.voiceSelect, this.modalVoiceSelect].filter(Boolean);
+    selects.forEach(sel => sel.innerHTML = '');
     
     if (!voices || voices.length === 0) {
-      this.voiceSelect.innerHTML = '<option value="xHUwLsLfyqiYOIVTzLRW">🧠 Marcos (Neural PT-BR)</option>';
+      selects.forEach(sel => {
+        sel.innerHTML = '<option value="xHUwLsLfyqiYOIVTzLRW">🧠 Marcos (Neural PT-BR)</option>';
+      });
+      if (this.currentVoiceBadge) this.currentVoiceBadge.innerText = 'Marcos (Neural)';
       return;
     }
 
-    voices.forEach(voice => {
-      const option = document.createElement('option');
-      option.value = voice.voiceURI;
-      option.textContent = `🧠 ${voice.name} (${voice.category || 'Professor'})`;
-        
-      if (this.audioEngine.selectedVoice && voice.voiceURI === this.audioEngine.selectedVoice.voiceURI) {
-        option.selected = true;
-      }
-      this.voiceSelect.appendChild(option);
+    selects.forEach(sel => {
+      voices.forEach(voice => {
+        const option = document.createElement('option');
+        option.value = voice.voiceURI;
+        option.textContent = `🧠 ${voice.name} (${voice.category || 'Professor'})`;
+          
+        if (this.audioEngine.selectedVoice && voice.voiceURI === this.audioEngine.selectedVoice.voiceURI) {
+          option.selected = true;
+          if (this.currentVoiceBadge) this.currentVoiceBadge.innerText = voice.name;
+        }
+        sel.appendChild(option);
+      });
     });
   }
 
