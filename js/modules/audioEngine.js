@@ -169,35 +169,85 @@ class AudioEngine {
   }
 
   /**
-   * Inicializa as vozes do backend ElevenLabs e restaura a voz preferida
+   * Inicializa as vozes do backend ElevenLabs e do dispositivo nativo
    */
   async initVoices() {
+    this.availableVoices = [];
+    
+    // 1. Carrega vozes neurais da plataforma (Backend ElevenLabs)
     try {
       const res = await fetch('/api/tts/voices');
       const data = await res.json();
       
       if (data && data.voices && data.voices.length > 0) {
-        this.availableVoices = data.voices.map(v => ({
-          voiceURI: v.id,
-          name: v.name,
-          lang: v.lang || 'pt-BR',
-          gender: v.gender || 'didática',
-          category: v.category || 'Professor de Direito',
-          description: v.description || 'Voz neural de alta definição',
-          isNeural: true
-        }));
-
-        // Restaura a voz salva pelo usuário ou adota a primeira voz padrão (Prof. Carlos)
-        const savedSettings = StorageModule.getSettings();
-        if (savedSettings.voiceURI) {
-          const match = this.availableVoices.find(v => v.voiceURI === savedSettings.voiceURI);
-          this.selectedVoice = match || this.availableVoices[0];
-        } else {
-          this.selectedVoice = this.availableVoices[0];
-        }
+        data.voices.forEach(v => {
+          this.availableVoices.push({
+            voiceURI: v.id,
+            name: v.name,
+            lang: v.lang || 'pt-BR',
+            gender: v.gender || 'Masculino',
+            category: v.category || 'Professor de Direito',
+            description: v.description || 'Voz neural de alta definição',
+            isNeural: true,
+            pitch: v.gender === 'Feminino' ? 1.18 : 0.90
+          });
+        });
       }
     } catch (err) {
       console.warn('[Voices API Error] Não foi possível conectar ao backend para listar vozes:', err);
+    }
+
+    // 2. Carrega vozes locais/nativas instaladas no dispositivo (Android, iOS/Apple, Windows, Mac)
+    if ('speechSynthesis' in window) {
+      const deviceVoices = window.speechSynthesis.getVoices() || [];
+      const ptDeviceVoices = deviceVoices.filter(v => v.lang && (v.lang.toLowerCase().includes('pt') || v.lang.toLowerCase().startsWith('pt')));
+      
+      const targetVoices = ptDeviceVoices.length > 0 ? ptDeviceVoices : deviceVoices.slice(0, 5);
+      
+      targetVoices.forEach(v => {
+        if (!this.availableVoices.some(av => av.voiceURI === (v.voiceURI || v.name))) {
+          const isFemale = /maria|helena|beatriz|luciana|joana|catarina|leticia|francisca|female|zira/i.test(v.name);
+          this.availableVoices.push({
+            voiceURI: v.voiceURI || v.name,
+            name: `${v.name} (Aparelho)`,
+            lang: v.lang,
+            gender: isFemale ? 'Feminino' : 'Masculino',
+            category: 'Voz do Dispositivo',
+            description: `Voz local do seu aparelho (${v.lang})`,
+            isDevice: true,
+            nativeVoice: v,
+            pitch: isFemale ? 1.15 : 0.95
+          });
+        }
+      });
+
+      if (!this._voicesChangedRegistered) {
+        this._voicesChangedRegistered = true;
+        window.speechSynthesis.onvoiceschanged = () => {
+          this.initVoices();
+        };
+      }
+    }
+
+    // 3. Se nenhuma voz estiver disponível, define padrão
+    if (this.availableVoices.length === 0) {
+      this.availableVoices.push({
+        voiceURI: 'xHUwLsLfyqiYOIVTzLRW',
+        name: 'Marcos (Neural PT-BR)',
+        lang: 'pt-BR',
+        gender: 'Masculino',
+        category: 'Professor de Direito',
+        isNeural: true
+      });
+    }
+
+    // 4. Restaura a voz salva pelo usuário ou adota a primeira voz padrão
+    const savedSettings = StorageModule.getSettings();
+    if (savedSettings.voiceURI) {
+      const match = this.availableVoices.find(v => v.voiceURI === savedSettings.voiceURI || v.name === savedSettings.voiceURI);
+      this.selectedVoice = match || this.availableVoices[0];
+    } else {
+      this.selectedVoice = this.availableVoices[0];
     }
 
     if (this.onVoicesLoaded) {
@@ -206,7 +256,7 @@ class AudioEngine {
   }
 
   setVoiceByURI(voiceURI) {
-    const voice = this.availableVoices.find(v => v.voiceURI === voiceURI);
+    const voice = this.availableVoices.find(v => v.voiceURI === voiceURI || v.name === voiceURI);
     if (voice) {
       this.selectedVoice = voice;
       this.preloadAudioMap.clear(); // Limpa pré-carregamentos de vozes anteriores
@@ -442,6 +492,12 @@ class AudioEngine {
     this.lastSpokenText = text;
     const humanizedText = this.humanizeLegalText(text);
 
+    // Se o usuário escolheu expressamente uma voz do aparelho/dispositivo
+    if (this.selectedVoice && this.selectedVoice.isDevice) {
+      this.speakWebSpeech(humanizedText);
+      return;
+    }
+
     // Sinaliza Estado "Preparando áudio..."
     this.isLoading = true;
     this.notifyStateChange({ isPlaying: false, isPaused: false, isLoading: true, article: this.currentArticle });
@@ -499,21 +555,53 @@ class AudioEngine {
     utterance.lang = 'pt-BR';
     utterance.rate = this.speed || 1.0;
 
-    const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find(v => v.lang && (v.lang.includes('pt-BR') || v.lang.includes('pt_BR'))) || voices.find(v => v.lang && v.lang.startsWith('pt'));
-    if (ptVoice) utterance.voice = ptVoice;
+    const voices = window.speechSynthesis.getVoices() || [];
+    let chosenVoice = null;
+    let pitch = 1.0;
+
+    if (this.selectedVoice) {
+      // 1. Tenta encontrar a voz pelo URI ou Nome exato
+      chosenVoice = voices.find(v => v.voiceURI === this.selectedVoice.voiceURI || v.name === this.selectedVoice.name || v.voiceURI === this.selectedVoice.nativeVoice?.voiceURI);
+      
+      // 2. Se for um preset neural (ex: Helena, Beatriz, Gabriel, Carlos, Marcos) em fallback nativo:
+      if (!chosenVoice) {
+        const isFemaleTarget = this.selectedVoice.gender === 'Feminino' || /helena|beatriz|feminino/i.test(this.selectedVoice.name);
+        const ptVoices = voices.filter(v => v.lang && (v.lang.toLowerCase().includes('pt') || v.lang.toLowerCase().startsWith('pt')));
+        
+        if (isFemaleTarget) {
+          chosenVoice = ptVoices.find(v => /maria|luciana|joana|catarina|leticia|francisca|female|zira/i.test(v.name)) || ptVoices[1] || ptVoices[0];
+          pitch = 1.18; // Timbre agudo/feminino
+        } else {
+          chosenVoice = ptVoices.find(v => /daniel|carlos|gabriel|marcos|rodrigo|male|david/i.test(v.name)) || ptVoices[0];
+          pitch = 0.88; // Timbre grave/masculino
+        }
+      }
+    }
+
+    // Fallback genérico para qualquer voz em português
+    if (!chosenVoice) {
+      chosenVoice = voices.find(v => v.lang && (v.lang.includes('pt-BR') || v.lang.includes('pt_BR'))) || voices.find(v => v.lang && v.lang.startsWith('pt')) || voices[0];
+    }
+
+    if (chosenVoice) {
+      utterance.voice = chosenVoice;
+      utterance.lang = chosenVoice.lang || 'pt-BR';
+    }
+
+    utterance.pitch = pitch;
 
     utterance.onstart = () => {
       this.isLoading = false;
       this.isPlaying = true;
       this.isPaused = false;
       this.listenStartTimestamp = Date.now();
+      const activeVoiceName = this.selectedVoice ? this.selectedVoice.name : (chosenVoice ? chosenVoice.name : 'Voz Nativa');
       this.notifyStateChange({
         isPlaying: true,
         isPaused: false,
         isLoading: false,
         article: this.currentArticle,
-        voice: { name: ptVoice ? ptVoice.name : 'Voz Nativa' }
+        voice: { name: activeVoiceName }
       });
     };
 
