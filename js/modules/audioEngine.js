@@ -477,20 +477,63 @@ class AudioEngine {
       this.audioPlayer.playbackRate = this.speed;
 
     } catch (err) {
-      console.error('[AudioEngine ElevenLabs Error]', err);
+      console.warn('[AudioEngine ElevenLabs Fallback]', err.message);
+      // Fallback nativo imediato sem alertar erro vermelho invasivo
+      this.speakWebSpeech(humanizedText);
+    }
+  }
+
+  /**
+   * Sintetizador de Voz Nativa Web Speech (Fallback transparente e resiliente)
+   */
+  speakWebSpeech(text) {
+    if (!('speechSynthesis' in window)) {
       this.isLoading = false;
       this.isPlaying = false;
-      this.isPaused = false;
-      
       this.notifyStateChange({ isPlaying: false, isPaused: false, isLoading: false, article: this.currentArticle });
-
-      if (this.onError) {
-        this.onError({
-          message: err.message || 'Falha ao conectar com o serviço ElevenLabs. Verifique sua API Key no arquivo .env.',
-          code: 'TTS_API_ERROR'
-        });
-      }
+      return;
     }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'pt-BR';
+    utterance.rate = this.speed || 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const ptVoice = voices.find(v => v.lang && (v.lang.includes('pt-BR') || v.lang.includes('pt_BR'))) || voices.find(v => v.lang && v.lang.startsWith('pt'));
+    if (ptVoice) utterance.voice = ptVoice;
+
+    utterance.onstart = () => {
+      this.isLoading = false;
+      this.isPlaying = true;
+      this.isPaused = false;
+      this.listenStartTimestamp = Date.now();
+      this.notifyStateChange({
+        isPlaying: true,
+        isPaused: false,
+        isLoading: false,
+        article: this.currentArticle,
+        voice: { name: ptVoice ? ptVoice.name : 'Voz Nativa' }
+      });
+    };
+
+    utterance.onend = () => {
+      this.isPlaying = false;
+      this.isPaused = false;
+      this.notifyStateChange({ isPlaying: false, isPaused: false, isLoading: false, article: this.currentArticle });
+      if (this.currentArticle && this.isRepeatMode) {
+        this.playArticle(this.currentArticle);
+      }
+    };
+
+    utterance.onerror = (e) => {
+      console.warn('[WebSpeech Error]', e);
+      this.isPlaying = false;
+      this.isLoading = false;
+      this.notifyStateChange({ isPlaying: false, isPaused: false, isLoading: false, article: this.currentArticle });
+    };
+
+    window.speechSynthesis.speak(utterance);
   }
 
   /**
@@ -516,12 +559,22 @@ class AudioEngine {
   }
 
   pause() {
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+    }
     if (!this.audioPlayer.paused) {
       this.audioPlayer.pause();
     }
   }
 
   resume() {
+    if (window.speechSynthesis && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      this.isPlaying = true;
+      this.isPaused = false;
+      this.notifyStateChange({ isPlaying: true, isPaused: false, isLoading: false, article: this.currentArticle });
+      return;
+    }
     if (this.audioPlayer.paused && this.audioPlayer.src) {
       this.audioPlayer.play();
     } else if (this.currentArticle) {
@@ -539,15 +592,24 @@ class AudioEngine {
     }
   }
 
-  stopAudioSource() {
+  stop() {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     if (this.audioPlayer) {
       this.audioPlayer.pause();
       this.audioPlayer.currentTime = 0;
     }
-  }
-
+    this.isPlaying = false;
+    this.isPaused = false;
   stop() {
-    this.stopAudioSource();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (this.audioPlayer) {
+      this.audioPlayer.pause();
+      this.audioPlayer.currentTime = 0;
+    }
     this.isPlaying = false;
     this.isPaused = false;
     this.isLoading = false;
