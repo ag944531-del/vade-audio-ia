@@ -602,16 +602,6 @@ class AudioEngine {
     }
     this.isPlaying = false;
     this.isPaused = false;
-  stop() {
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    if (this.audioPlayer) {
-      this.audioPlayer.pause();
-      this.audioPlayer.currentTime = 0;
-    }
-    this.isPlaying = false;
-    this.isPaused = false;
     this.isLoading = false;
 
     if (this.listenStartTimestamp) {
